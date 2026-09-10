@@ -16,6 +16,52 @@ export class AssetsService {
     @InjectConnection() private connection: Connection,
   ) {}
 
+  async getAssets() {
+    return this.assetModel.find().populate('heldBy').exec();
+  }
+
+  async getHistory(assetId: string) {
+    return this.movementModel.find({ assetId }).sort({ occurredAt: 1 }).exec();
+  }
+
+  async getStoreAsOf(instant: Date, assetId?: string) {
+    const query: any = {
+      occurredAt: { $lte: instant },
+      correctedBy: null
+    };
+    if (assetId) {
+      query.assetId = assetId;
+    }
+    
+    const movements = await this.movementModel
+      .find(query)
+      .sort({ occurredAt: 1 })
+      .populate('workerId')
+      .exec();
+
+    // Group by assetId
+    const stateByAsset = new Map<string, any>();
+    
+    for (const m of movements) {
+      const aId = m.assetId.toString();
+      if (m.type === 'issue') {
+        stateByAsset.set(aId, m.workerId);
+      } else if (m.type === 'return' || m.type === 'out_of_service') {
+        stateByAsset.set(aId, null);
+      }
+    }
+
+    const results = [];
+    for (const [aId, holder] of stateByAsset.entries()) {
+      results.push({
+        assetId: aId,
+        holder: holder ? holder : 'unheld'
+      });
+    }
+
+    return results;
+  }
+
   async issueAsset(assetId: string, workerId: string, occurredAt: Date, idempotencyKey: string) {
     const existingMovement = await this.movementModel.findOne({ idempotencyKey }).exec();
     if (existingMovement) {

@@ -25,6 +25,12 @@ export class Movement {
 
   @Prop({ type: String, default: null })
   reason: string | null;
+
+  @Prop({ type: Types.ObjectId, ref: 'Movement', default: null })
+  correctedBy: Types.ObjectId | string | null;
+
+  @Prop({ type: Types.ObjectId, ref: 'Movement', default: null })
+  correctionOf: Types.ObjectId | string | null;
 }
 
 export const MovementSchema = SchemaFactory.createForClass(Movement);
