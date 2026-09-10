@@ -4,6 +4,7 @@ import { Model, Connection, ClientSession } from 'mongoose';
 import { Asset, AssetDocument } from './schemas/asset.schema.js';
 import { Movement, MovementDocument } from '../movements/schemas/movement.schema.js';
 import { Worker, WorkerDocument } from '../workers/schemas/worker.schema.js';
+import { Reservation, ReservationDocument } from '../reservations/schemas/reservation.schema.js';
 
 @Injectable()
 export class AssetsService {
@@ -11,6 +12,7 @@ export class AssetsService {
     @InjectModel(Asset.name) private assetModel: Model<AssetDocument>,
     @InjectModel(Movement.name) private movementModel: Model<MovementDocument>,
     @InjectModel(Worker.name) private workerModel: Model<WorkerDocument>,
+    @InjectModel(Reservation.name) private reservationModel: Model<ReservationDocument>,
     @InjectConnection() private connection: Connection,
   ) {}
 
@@ -87,6 +89,68 @@ export class AssetsService {
 
       return movement;
     });
+  }
+
+  async markOutOfService(assetId: string, reason: string, idempotencyKey: string) {
+    const existingMovement = await this.movementModel.findOne({ idempotencyKey }).exec();
+    if (existingMovement) {
+      return existingMovement;
+    }
+
+    return this.withTransaction(async (session) => {
+      await this.assetModel.updateOne(
+        { _id: assetId },
+        { $set: { serviceStatus: 'out_of_service' } },
+        { session }
+      ).exec();
+
+      const movement = new this.movementModel({
+        assetId,
+        workerId: null,
+        type: 'out_of_service',
+        occurredAt: new Date(),
+        recordedAt: new Date(),
+        idempotencyKey,
+        reason,
+      });
+      await movement.save({ session });
+
+      await this.reservationModel.updateMany(
+        { assetId, status: 'active', startAt: { $gt: new Date() } },
+        { $set: { status: 'cancelled', reason: 'asset marked out of service' } },
+        { session }
+      ).exec();
+
+      return movement;
+    });
+  }
+
+  async markInService(assetId: string, idempotencyKey: string) {
+    const existingMovement = await this.movementModel.findOne({ idempotencyKey }).exec();
+    if (existingMovement) {
+      return existingMovement;
+    }
+
+    const updateResult = await this.assetModel.updateOne(
+      { _id: assetId, serviceStatus: 'out_of_service' },
+      { $set: { serviceStatus: 'in_service' } }
+    ).exec();
+
+    if (updateResult.matchedCount === 0) {
+      throw new ConflictException("Asset is not currently out of service");
+    }
+
+    const movement = new this.movementModel({
+      assetId,
+      workerId: null,
+      type: 'in_service',
+      occurredAt: new Date(),
+      recordedAt: new Date(),
+      idempotencyKey,
+    });
+    await movement.save();
+
+    return movement;
   }
 
   private async withTransaction<T>(fn: (session: ClientSession) => Promise<T>): Promise<T> {
