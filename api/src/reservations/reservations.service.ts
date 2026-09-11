@@ -12,10 +12,15 @@ export class ReservationsService {
     @InjectConnection() private connection: Connection,
   ) {}
 
-  async getReservations(assetId: string) {
-    const query: any = Types.ObjectId.isValid(assetId)
-      ? { $or: [{ assetId: new Types.ObjectId(assetId) }, { assetId }] }
-      : { assetId };
+  async getReservations(assetId?: string) {
+    const query: any = {};
+    if (assetId) {
+      query.assetId = Types.ObjectId.isValid(assetId)
+        ? { $or: [{ assetId: new Types.ObjectId(assetId) }, { assetId }] }
+        : assetId;
+    } else {
+      query.status = 'active'; // when fetching all, just get active ones
+    }
     return this.reservationModel.find(query).sort({ startAt: 1 }).exec();
   }
 

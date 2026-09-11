@@ -8,15 +8,17 @@ import { apiFetch, generateIdempotencyKey } from '../lib/api';
 export default function StoreTable({
   initialAssets,
   workers,
+  reservations,
 }: {
   initialAssets: any[];
   workers: any[];
+  reservations: any[];
 }) {
   const router = useRouter();
 
   // Search and filter states
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'in_store' | 'issued' | 'out_of_service'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'in_store' | 'issued' | 'out_of_service' | 'overdue' | 'reserved'>('all');
   const [kindFilter, setKindFilter] = useState<string>('all');
 
   // Modal states
@@ -48,12 +50,23 @@ export default function StoreTable({
     let inStore = 0;
     let issued = 0;
     let outOfService = 0;
+    let overdue = 0;
+    let reserved = 0;
+    const now = new Date();
+    const OVERDUE_MS = 14 * 24 * 60 * 60 * 1000;
 
     initialAssets.forEach((a) => {
+      const isOverdue = a.heldBy && a.lastIssuedAt && (now.getTime() - new Date(a.lastIssuedAt).getTime() > OVERDUE_MS);
+      const isReserved = !a.heldBy && a.serviceStatus !== 'out_of_service' && reservations.some((r: any) => r.assetId === a._id && new Date(r.startAt) <= now && new Date(r.endAt) >= now);
+
       if (a.serviceStatus === 'out_of_service') {
         outOfService++;
+      } else if (isOverdue) {
+        overdue++;
       } else if (a.heldBy) {
         issued++;
+      } else if (isReserved) {
+        reserved++;
       } else {
         inStore++;
       }
@@ -64,8 +77,10 @@ export default function StoreTable({
       inStore,
       issued,
       outOfService,
+      overdue,
+      reserved,
     };
-  }, [initialAssets]);
+  }, [initialAssets, reservations]);
 
   // Filtered assets
   const filteredAssets = useMemo(() => {
@@ -80,12 +95,21 @@ export default function StoreTable({
       }
 
       // Status filter
+      const now = new Date();
+      const OVERDUE_MS = 14 * 24 * 60 * 60 * 1000;
+      const isOverdue = a.heldBy && a.lastIssuedAt && (now.getTime() - new Date(a.lastIssuedAt).getTime() > OVERDUE_MS);
+      const isReserved = !a.heldBy && a.serviceStatus !== 'out_of_service' && reservations.some((r: any) => r.assetId === a._id && new Date(r.startAt) <= now && new Date(r.endAt) >= now);
+
       if (statusFilter === 'in_store') {
-        if (a.heldBy || a.serviceStatus === 'out_of_service') return false;
+        if (a.heldBy || a.serviceStatus === 'out_of_service' || isReserved) return false;
       } else if (statusFilter === 'issued') {
-        if (!a.heldBy || a.serviceStatus === 'out_of_service') return false;
+        if (!a.heldBy || a.serviceStatus === 'out_of_service' || isOverdue) return false;
       } else if (statusFilter === 'out_of_service') {
         if (a.serviceStatus !== 'out_of_service') return false;
+      } else if (statusFilter === 'overdue') {
+        if (!isOverdue) return false;
+      } else if (statusFilter === 'reserved') {
+        if (!isReserved) return false;
       }
 
       // Kind filter
@@ -222,6 +246,16 @@ export default function StoreTable({
             <span className="font-semibold text-zinc-900">{metrics.issued}</span>
           </div>
           <div className="px-3 py-1.5 rounded bg-white border border-zinc-200 shadow-xs flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-red-500"></span>
+            <span className="text-zinc-500">OVERDUE</span>
+            <span className="font-semibold text-zinc-900">{metrics.overdue}</span>
+          </div>
+          <div className="px-3 py-1.5 rounded bg-white border border-zinc-200 shadow-xs flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-yellow-500"></span>
+            <span className="text-zinc-500">RESERVED</span>
+            <span className="font-semibold text-zinc-900">{metrics.reserved}</span>
+          </div>
+          <div className="px-3 py-1.5 rounded bg-white border border-zinc-200 shadow-xs flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-zinc-400"></span>
             <span className="text-zinc-500">OOS</span>
             <span className="font-semibold text-zinc-900">{metrics.outOfService}</span>
@@ -284,6 +318,26 @@ export default function StoreTable({
               Issued ({metrics.issued})
             </button>
             <button
+              onClick={() => setStatusFilter('overdue')}
+              className={`px-3 py-1.5 rounded-md transition-colors ${
+                statusFilter === 'overdue'
+                  ? 'bg-zinc-900 text-white shadow-xs'
+                  : 'text-zinc-600 hover:text-zinc-900'
+              }`}
+            >
+              Overdue ({metrics.overdue})
+            </button>
+            <button
+              onClick={() => setStatusFilter('reserved')}
+              className={`px-3 py-1.5 rounded-md transition-colors ${
+                statusFilter === 'reserved'
+                  ? 'bg-zinc-900 text-white shadow-xs'
+                  : 'text-zinc-600 hover:text-zinc-900'
+              }`}
+            >
+              Reserved ({metrics.reserved})
+            </button>
+            <button
               onClick={() => setStatusFilter('out_of_service')}
               className={`px-3 py-1.5 rounded-md transition-colors ${
                 statusFilter === 'out_of_service'
@@ -329,6 +383,10 @@ export default function StoreTable({
               {filteredAssets.map((asset) => {
                 const isHeld = !!asset.heldBy;
                 const isOOS = asset.serviceStatus === 'out_of_service';
+                const now = new Date();
+                const OVERDUE_MS = 14 * 24 * 60 * 60 * 1000;
+                const isOverdue = isHeld && asset.lastIssuedAt && (now.getTime() - new Date(asset.lastIssuedAt).getTime() > OVERDUE_MS);
+                const isReserved = !isHeld && !isOOS && reservations.some((r: any) => r.assetId === asset._id && new Date(r.startAt) <= now && new Date(r.endAt) >= now);
 
                 return (
                   <tr
@@ -369,10 +427,20 @@ export default function StoreTable({
                           <span className="w-1.5 h-1.5 rounded-full bg-zinc-400"></span>
                           Out of Service
                         </span>
+                      ) : isOverdue ? (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-red-50 text-red-900 border border-red-200/60">
+                          <span className="w-1.5 h-1.5 rounded-full bg-red-500"></span>
+                          Overdue
+                        </span>
                       ) : isHeld ? (
                         <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-50 text-amber-900 border border-amber-200/60">
                           <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
                           Issued
+                        </span>
+                      ) : isReserved ? (
+                        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-yellow-50 text-yellow-900 border border-yellow-200/60">
+                          <span className="w-1.5 h-1.5 rounded-full bg-yellow-500"></span>
+                          Reserved
                         </span>
                       ) : (
                         <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-50 text-emerald-900 border border-emerald-200/60">

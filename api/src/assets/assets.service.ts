@@ -87,7 +87,7 @@ export class AssetsService {
     return this.withTransaction(async (session) => {
       const asset = await this.assetModel.findOneAndUpdate(
         { _id: assetId, heldBy: null, serviceStatus: 'in_service' },
-        { $set: { heldBy: workerId } },
+        { $set: { heldBy: workerId, lastIssuedAt: occurredAt } },
         { new: true, session }
       ).exec();
 
@@ -126,7 +126,7 @@ export class AssetsService {
             { _id: aId, heldBy: wId }
           ]
         },
-        { $set: { heldBy: null } },
+        { $set: { heldBy: null, lastIssuedAt: null } },
         { new: true, session }
       ).exec();
 

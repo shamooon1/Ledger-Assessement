@@ -6,7 +6,7 @@ export class ReservationsController {
   constructor(private readonly reservationsService: ReservationsService) { }
 
   @Get('reservations')
-  getReservations(@Query('assetId') assetId: string) {
+  getReservations(@Query('assetId') assetId?: string) {
     return this.reservationsService.getReservations(assetId);
   }
 

@@ -443,7 +443,7 @@ export class SeedService {
     );
     await this.assetModel.updateOne(
       { code: 'DRL-001' },
-      { $set: { heldBy: workerMap.get('Worker 5')!._id } },
+      { $set: { heldBy: workerMap.get('Worker 5')!._id, lastIssuedAt: d(0, -3) } },
     );
 
     // Overdue Item (Requirement: at least one overdue)
@@ -460,7 +460,7 @@ export class SeedService {
     );
     await this.assetModel.updateOne(
       { code: 'LVL-001' },
-      { $set: { heldBy: workerMap.get('Worker 9')!._id } },
+      { $set: { heldBy: workerMap.get('Worker 9')!._id, lastIssuedAt: d(-16, 9) } },
     );
 
     // Out of service movements

@@ -21,6 +21,9 @@ export class Asset {
   @Prop({ type: Types.ObjectId, ref: 'Worker', default: null })
   heldBy: Worker | Types.ObjectId | null;
 
+  @Prop({ type: Date, default: null })
+  lastIssuedAt: Date | null;
+
   @Prop({ type: Number, default: 0 })
   reservationTouch: number;
 }
