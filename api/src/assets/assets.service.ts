@@ -1,6 +1,6 @@
 import { Injectable, ConflictException, InternalServerErrorException, UnprocessableEntityException } from '@nestjs/common';
 import { InjectModel, InjectConnection } from '@nestjs/mongoose';
-import { Model, Connection, ClientSession } from 'mongoose';
+import { Model, Types, type Connection, type ClientSession } from 'mongoose';
 import { Asset, AssetDocument } from './schemas/asset.schema.js';
 import { Movement, MovementDocument } from '../movements/schemas/movement.schema.js';
 import { Worker, WorkerDocument } from '../workers/schemas/worker.schema.js';
@@ -21,7 +21,10 @@ export class AssetsService {
   }
 
   async getHistory(assetId: string) {
-    return this.movementModel.find({ assetId }).sort({ occurredAt: 1 }).exec();
+    const query = Types.ObjectId.isValid(assetId)
+      ? { $or: [{ assetId: new Types.ObjectId(assetId) }, { assetId }] }
+      : { assetId };
+    return this.movementModel.find(query).sort({ occurredAt: 1 }).exec();
   }
 
   async getStoreAsOf(instant: Date, assetId?: string) {
@@ -112,9 +115,17 @@ export class AssetsService {
       return existingMovement;
     }
 
+    const wId = Types.ObjectId.isValid(workerId) ? new Types.ObjectId(workerId) : workerId;
+    const aId = Types.ObjectId.isValid(assetId) ? new Types.ObjectId(assetId) : assetId;
+
     return this.withTransaction(async (session) => {
       const asset = await this.assetModel.findOneAndUpdate(
-        { _id: assetId, heldBy: workerId },
+        { 
+          $or: [
+            { _id: assetId, heldBy: workerId },
+            { _id: aId, heldBy: wId }
+          ]
+        },
         { $set: { heldBy: null } },
         { new: true, session }
       ).exec();

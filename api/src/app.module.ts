@@ -1,11 +1,11 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
-import { AssetsModule } from './assets/assets.module';
-import { WorkersModule } from './workers/workers.module';
-import { MovementsModule } from './movements/movements.module';
-import { ReservationsModule } from './reservations/reservations.module';
-import { SeedModule } from './seed/seed.module';
+import { AssetsModule } from './assets/assets.module.js';
+import { WorkersModule } from './workers/workers.module.js';
+import { MovementsModule } from './movements/movements.module.js';
+import { ReservationsModule } from './reservations/reservations.module.js';
+import { SeedModule } from './seed/seed.module.js';
 
 @Module({
   imports: [

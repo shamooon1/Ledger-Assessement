@@ -1,6 +1,6 @@
 import { Injectable, BadRequestException, ConflictException, InternalServerErrorException } from '@nestjs/common';
 import { InjectModel, InjectConnection } from '@nestjs/mongoose';
-import { Model, Connection, ClientSession } from 'mongoose';
+import { Model, Types, type Connection, type ClientSession } from 'mongoose';
 import { Reservation, ReservationDocument } from './schemas/reservation.schema.js';
 import { Asset, AssetDocument } from '../assets/schemas/asset.schema.js';
 
@@ -13,7 +13,10 @@ export class ReservationsService {
   ) {}
 
   async getReservations(assetId: string) {
-    return this.reservationModel.find({ assetId, status: 'active' }).sort({ startAt: 1 }).exec();
+    const query: any = Types.ObjectId.isValid(assetId)
+      ? { $or: [{ assetId: new Types.ObjectId(assetId) }, { assetId }] }
+      : { assetId };
+    return this.reservationModel.find(query).sort({ startAt: 1 }).exec();
   }
 
   async createReservation(assetId: string, workerId: string, startAt: Date, endAt: Date, idempotencyKey: string) {

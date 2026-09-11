@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, ConflictException, InternalServerErrorException } from '@nestjs/common';
 import { InjectModel, InjectConnection } from '@nestjs/mongoose';
-import { Model, Connection, ClientSession } from 'mongoose';
+import { Model, type Connection, type ClientSession } from 'mongoose';
 import { Movement, MovementDocument } from './schemas/movement.schema.js';
 
 @Injectable()

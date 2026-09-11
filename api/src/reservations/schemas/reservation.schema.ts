@@ -1,7 +1,7 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Types } from 'mongoose';
-import { Asset } from '../../assets/schemas/asset.schema';
-import { Worker } from '../../workers/schemas/worker.schema';
+import { Asset } from '../../assets/schemas/asset.schema.js';
+import { Worker } from '../../workers/schemas/worker.schema.js';
 
 export type ReservationDocument = Reservation & Document;
 
